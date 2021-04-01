@@ -1,0 +1,197 @@
+---
+title: "coding_michael"
+author: "Eliane Mitchell"
+date: "3/19/2021"
+output: html_document
+
+---
+## Step 1: Load Packages
+
+```{r}
+library(tidyverse)
+library("xlsx")
+library(tm)
+library(stringr)
+library(glue)
+```
+
+## Step 2: Load in data
+
+```{r }
+data <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data.xlsx", sheetIndex = 1, endRow=52)
+
+keys <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data.xlsx", sheetIndex = 3, endRow=40)
+
+```
+
+## Step 3: Take out top row in Excel dataframe (says instructions)
+
+```{r}
+dat <- sapply(data, as.character)
+colnames(dat) <- dat[1, ]
+dat <- as.data.frame(dat[-1,])
+dat <- dat[,-c(2,4)]
+```
+
+## Step 4: Rename columns, eliminate rows and columns, put survey responses in lower cases
+```{r}
+keys <- keys %>% select(2:3)
+keys <- keys[1:32,]
+keys_data <- keys %>% rename(key_words=Key.Words) %>% mutate(key_words = str_squish(key_words))
+keys_data$key_words <- tolower(keys_data$key_words)
+```
+
+## Step 5: extract first 25 rows
+```{r}
+first25 <- dat %>% mutate(
+  response_lower = tolower(Response),
+  response_lower = str_replace_all(response_lower, "[[:punct:]]", ""),
+  response_lower = str_squish(response_lower)
+) %>% head(25)
+## "(\\.|,)"
+```
+
+## Step 6: end result is new_prac data frame 
+
+```{r}
+
+first25$NLP_heads <- sapply(first25$response_lower, FUN = function(x){ 
+  matches <- c("")
+  for (row in 1:nrow(keys_data)) { 
+    string_head <- keys_data[row, "key_words"] 
+    if(isTRUE(grepl(string_head, x))) { 
+      matches <- paste(matches, row) 
+    } else {
+      matches <- paste(matches, "") } }
+  matches } ) 
+
+# note that the E columns are NOT correct at this stage
+new_prac <- first25 %>% 
+  mutate(unite(across(everything(), ~ ifelse(. == "1", cur_column(), NA)),
+               na.rm = T,
+               col = "manual_heads")) %>%
+  mutate(across(3:34, .names = "e_{.col}" )) %>%
+  rename_with(~str_c("k_", .), c(3:34))     
+
+```
+
+## Step 7: 
+## Create columns and rename katie's columns
+## change NAs to 0s to make computing easier
+
+```{r}
+index <- is.na(new_prac)
+new_prac[index] <- 0
+```
+
+## Step 8: change E rows
+
+```{r}
+
+for (i in 1:nrow(new_prac)) {
+  response <- new_prac[i, "response_lower"]
+  for (row in 1:nrow(keys_data)) {
+    headline <- keys_data[row, "key_words"]
+    col <- gsub(" ", "", paste("e_", row))
+    if(isTRUE(grepl(headline, response))) {
+      new_prac[i, col] = 1
+    } else {
+      new_prac[i, col] = 0 
+    }
+  }
+} 
+
+```
+
+## Step 9: 
+
+
+```{r}
+
+df <- new_prac
+
+df[3:34] <- lapply(df[3:34], as.numeric)
+df[39:70] <- lapply(df[39:70], as.numeric)
+
+df$hits <- NA_integer_
+df$not_matches <- NA_integer_
+
+suffixes <- 1:32
+for (i in 1:nrow(df)) {
+  hits <- vector("logical", length(suffixes))
+  names(hits) <- suffixes
+  not_matches <- vector("logical", length(suffixes))
+  names(not_matches) <- suffixes
+  for (j in suffixes) {
+    hits[[j]] <- (df[[glue("e_{j}")]][i] & df[[glue("k_{j}")]][i]) == 1
+    not_matches[[j]] <- df[[glue("e_{j}")]][i] != df[[glue("k_{j}")]][i]
+  }
+  df$hits[i] <- sum(hits, na.rm=T)
+  df$not_matches[i] <- sum(not_matches, na.rm = T)
+}
+
+
+df2 <- df %>% mutate( 
+                     total_hits_nm = hits + not_matches,
+                     percent_accuracy = hits / total_hits_nm, 
+                     manual_heads = str_replace_all(
+                       manual_heads, "[\\s_]", " "),
+                     NLP_heads = str_squish(NLP_heads))
+
+# Rearrange columns so more readable (I'm sure there's a way to NOT hard code this)
+
+df3 <- df2[, c(1, 36, 37, 38, 71, 72, 73, 74, 3, 39, 4, 40, 5, 41, 6, 42, 7, 43, 8, 44, 9, 45, 10, 46, 11, 47, 12, 48, 13, 49, 14, 50, 15, 51, 16, 52, 17, 53, 18, 54, 19, 55, 20, 56, 21, 57, 22, 58, 23, 59, 24, 60, 25, 61, 26, 62, 27, 63, 28, 64, 29, 65, 30, 66, 31, 67, 32, 68, 33, 69, 34, 70)] 
+
+```
+
+## Make two new columns
+
+```{r}
+
+df_string_attempts <- df3
+
+df_string_attempts$added <- ""
+df_string_attempts$missing <- ""
+
+suffixes <- 1:32
+
+for (i in 1:nrow(df_string_attempts)) {
+  added <- ""
+  missing <- ""
+  empty <- ""
+  for (j in suffixes) {
+    
+    if (isTRUE(df_string_attempts[[glue("e_{j}")]][i] > df_string_attempts[[glue("k_{j}")]][i])) {
+      added <- paste(added, j)
+    } else if (isTRUE(df_string_attempts[[glue("e_{j}")]][i] < df_string_attempts[[glue("k_{j}")]][i])) {
+      missing <- paste(missing, j) 
+    } else {
+      NULL
+    }
+    df_string_attempts$added[[i]] <- added
+    df_string_attempts$missing[[i]] <- missing
+  }
+}
+
+df_string_attempts <- df_string_attempts[, c(1:8, 73, 74, 9:72)] 
+
+response_closeup <- df_string_attempts %>% select(added, missing, response_lower) 
+
+#df_string_attempts <- df_string_attempts[, c(1:8, 73:74, 9:72)] 
+View(df_string_attempts)
+```
+
+## Find overall mean accuracy
+
+```{r}
+
+mean(df_string_attempts$percent_accuracy, na.rm = T)
+
+```
+
+
+```{r}
+#interesting problem - why isn't nixon included?
+# why is trump pays the schoo - headline 16
+```
+
