@@ -18,9 +18,11 @@ library(glue)
 ## Step 2: Load in data
 
 ```{r }
-data <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data.xlsx", sheetIndex = 1, endRow=52)
+data <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_three.xlsx", sheetIndex = 1, endRow=205)
+# 52 for both
+# 104 for overall
 
-keys <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data.xlsx", sheetIndex = 3, endRow=40)
+keys <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_three.xlsx", sheetIndex = 2, endRow=40)
 
 ```
 
@@ -31,57 +33,86 @@ dat <- sapply(data, as.character)
 colnames(dat) <- dat[1, ]
 dat <- as.data.frame(dat[-1,])
 dat <- dat[,-c(2,4)]
+
+first25 <- dat %>% mutate(
+  response_lower = tolower(Response),
+  response_lower = str_replace_all(response_lower, "[[:punct:]]", ""),
+  response_lower = str_squish(response_lower)
+) #%>% head(25)
+#%>% head(100) 
+first25$response_lower <- str_pad(first25$response_lower, 
+                                  str_length(first25$response_lower) + 2,
+                                  "both", " ")
+
+first25 <- first25[c(1:200), ]
+#first25 <- first25[c(26:50), ]  
+
 ```
 
 ## Step 4: Rename columns, eliminate rows and columns, put survey responses in lower cases
 ```{r}
-keys <- keys %>% select(2:3)
+#keys <- keys %>% select(2:3)
 keys <- keys[1:32,]
 keys_data <- keys %>% rename(key_words=Key.Words) %>% mutate(key_words = str_squish(key_words))
 keys_data$key_words <- tolower(keys_data$key_words)
 ```
 
-## Step 5: extract first 25 rows
-```{r}
-first25 <- dat %>% mutate(
-  response_lower = tolower(Response),
-  response_lower = str_replace_all(response_lower, "[[:punct:]]", ""),
-  response_lower = str_squish(response_lower)
-) %>% head(25)
-## "(\\.|,)"
-```
-
-## Step 6: end result is new_prac data frame 
+## Step 5: end result is new_prac data frame 
 
 ```{r}
 
-first25$NLP_heads <- sapply(first25$response_lower, FUN = function(x){ 
+first25$NLP_heads <- sapply(first25$response_lower, FUN = function(x){
   matches <- c("")
-  for (row in 1:nrow(keys_data)) { 
-    string_head <- keys_data[row, "key_words"] 
-    if(isTRUE(grepl(string_head, x))) { 
-      matches <- paste(matches, row) 
+  for (row in 1:nrow(keys_data)) {
+    string_head <- keys_data[row, "key_words"]
+    if(row == 23) {
+      if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("nixon", x))) {
+        matches <- paste(matches, row)
+      } else if(isTRUE(grepl(string_head, x))) {
+        matches <- paste(matches, "")
+      } else {
+        matches <- paste(matches, "")
+      }
+    } else {
+    if(isTRUE(grepl(string_head, x))) {
+      matches <- paste(matches, row)
     } else {
       matches <- paste(matches, "") } }
-  matches } ) 
+  matches } } )
+
+# first25$NLP_heads <- sapply(first25$response_lower, FUN = function(x){
+#   matches <- c("")
+#   for (row in 1:nrow(keys_data)) {
+#     string_head <- keys_data[row, "key_words"]
+#     if(isTRUE(grepl(string_head, x))) {
+#       matches <- paste(matches, row)
+#     } else {
+#       matches <- paste(matches, "") } }
+#   matches } )
 
 # note that the E columns are NOT correct at this stage
 new_prac <- first25 %>% 
-  mutate(unite(across(everything(), ~ ifelse(. == "1", cur_column(), NA)),
-               na.rm = T,
+  mutate(unite(across(everything(), 
+                      ~ ifelse( . == "1", 
+                                cur_column(), NA)), 
+               na.rm = T, 
                col = "manual_heads")) %>%
   mutate(across(3:34, .names = "e_{.col}" )) %>%
-  rename_with(~str_c("k_", .), c(3:34))     
-
+  rename_with(~str_c("k_", .), c(3:34))
+  
+  
 ```
 
 ## Step 7: 
 ## Create columns and rename katie's columns
 ## change NAs to 0s to make computing easier
-
+# change ? to 0s
 ```{r}
+
 index <- is.na(new_prac)
 new_prac[index] <- 0
+new_prac[new_prac=="?"]<- 0
+
 ```
 
 ## Step 8: change E rows
@@ -100,11 +131,9 @@ for (i in 1:nrow(new_prac)) {
     }
   }
 } 
-
 ```
 
 ## Step 9: 
-
 
 ```{r}
 
@@ -175,23 +204,32 @@ for (i in 1:nrow(df_string_attempts)) {
 
 df_string_attempts <- df_string_attempts[, c(1:8, 73, 74, 9:72)] 
 
-response_closeup <- df_string_attempts %>% select(added, missing, response_lower) 
+#View(df_string_attempts)
+View(df_string_attempts %>% select(response_lower,
+                              NLP_heads,
+                              manual_heads,
+                              added,
+                              missing))
 
-#df_string_attempts <- df_string_attempts[, c(1:8, 73:74, 9:72)] 
-View(df_string_attempts)
 ```
 
 ## Find overall mean accuracy
+```{r}
+df_string_attempts %>% filter(isTRUE(grepl("22", df_string_attempts$missing)))
+
+```
 
 ```{r}
 
 mean(df_string_attempts$percent_accuracy, na.rm = T)
+# currently, as it standss: 70% for second batch
 
 ```
-
 
 ```{r}
-#interesting problem - why isn't nixon included?
-# why is trump pays the schoo - headline 16
+# Look more closely 
+response_closeup <- df_string_attempts %>% select(added, missing, response_lower) 
+
 ```
+
 
