@@ -45,7 +45,7 @@ prep_section$response_lower <- str_pad(prep_section$response_lower,
                                   "both", " ")
 
 # Choose rows to isolate (can be 1-25, 26-50, 51-75, 76-100, 1-100, 101-150, 1-300, etc.)
-prep_section <- prep_section[c(1:200), ]
+prep_section <- prep_section[c(101:150), ]
 
 ```
 
@@ -67,32 +67,36 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
   matches <- c("") 
   for (row in 1:nrow(keys_data)) { 
     string_head <- keys_data[row, "key_words"] 
+    
     if(row == 22) { 
       if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("nixon", x))) {
         matches <- paste(matches, row)
+        next
       } else {
         matches <- paste(matches, "")
-      } next }
+        next
+      } }
+    
     if(row == 26) {
       if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("steel", x))) {
         matches <- paste(matches, row)
+        next
       } else {
         matches <- paste(matches, "")
-      } next }
+        next
+      } }
+    
     if(isTRUE(grepl(string_head, x))) {
       matches <- paste(matches, row)
     } else {
-      matches <- paste(matches, "")
-    } } matches } )
+      matches <- paste(matches, "") } } 
+  matches } )
 
 # Creates column with a list of the headlines that Katie identified. Also (optionally) adds columns with the headlines that the NLP identified, disaggregated (e_#)
 
 section <- prep_section %>% 
   mutate(unite(across(everything(), 
-                      ~ ifelse( . == "1", 
-                                cur_column(), NA)), 
-               na.rm = T, 
-               col = "manual_heads")) %>%
+                      ~ ifelse( . == "1", cur_column(), NA)), na.rm = T, col = "manual_heads")) %>%
   mutate(across(3:34, .names = "e_{.col}" )) %>%
   rename_with(~str_c("k_", .), c(3:34))
 
@@ -178,7 +182,6 @@ section3 <- section2[, c(1, 36, 37, 38, 71, 72, 73, 74, 3, 39, 4, 40, 5, 41, 6, 
 ## Step 9: Create columns that show whether the NLP added or missed a headline
 
 ```{r}
-
 section3$added <- ""
 section3$missing <- ""
 
@@ -202,13 +205,13 @@ for (i in 1:nrow(section3)) {
   }
 }
 
-section3 <- section3[, c(1:8, 73, 74, 9:72)] 
+section3 <- section3[, c(1:8, 73, 74, 9:72)]
+```
 
-# View(section3 %>% select(response_lower,
-#                               NLP_heads,
-#                               manual_heads,
-#                               added,
-#                               missing))
+
+```{r}
+
+View(section3 %>% select(response_lower, NLP_heads, manual_heads, added, missing))
 
 ```
 
