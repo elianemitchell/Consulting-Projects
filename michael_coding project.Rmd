@@ -19,68 +19,85 @@ library(glue)
 
 ```{r }
 data <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_three.xlsx", sheetIndex = 1, endRow=205)
-# 52 for both
-# 104 for overall
 
 keys <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_three.xlsx", sheetIndex = 2, endRow=40)
 
 ```
 
-## Step 3: Take out top row in Excel dataframe (says instructions)
+## Step 3: Clean up dataframe with responses and clean up responses themselves
 
 ```{r}
+
 dat <- sapply(data, as.character)
-colnames(dat) <- dat[1, ]
+colnames(dat) <- dat[1, ]  
 dat <- as.data.frame(dat[-1,])
 dat <- dat[,-c(2,4)]
 
-first25 <- dat %>% mutate(
-  response_lower = tolower(Response),
-  response_lower = str_replace_all(response_lower, "[[:punct:]]", ""),
-  response_lower = str_squish(response_lower)
-) #%>% head(25)
-#%>% head(100) 
-first25$response_lower <- str_pad(first25$response_lower, 
-                                  str_length(first25$response_lower) + 2,
+prep_section <- dat %>% mutate(
+  response_lower = tolower(Response), 
+  response_lower = str_replace_all(response_lower, "[[:punct:]]", ""), 
+  response_lower = str_squish(response_lower) 
+)
+
+# Adds space to front and end of string. This is so that, when matching patterns, the first and last words of a string are recognized
+prep_section$response_lower <- str_pad(prep_section$response_lower, 
+                                  str_length(prep_section$response_lower) + 2,
                                   "both", " ")
 
-first25 <- first25[c(1:200), ]
-#first25 <- first25[c(26:50), ]  
+# Choose rows to isolate (can be 1-25, 26-50, 51-75, 76-100, 1-100, 101-150, 1-300, etc.)
+prep_section <- prep_section[c(1:200), ]
 
 ```
 
-## Step 4: Rename columns, eliminate rows and columns, put survey responses in lower cases
+## Step 4: Clean up dataframe with key words. Clean up spacing, convert to lower case
+
 ```{r}
-#keys <- keys %>% select(2:3)
-keys <- keys[1:32,]
-keys_data <- keys %>% rename(key_words=Key.Words) %>% mutate(key_words = str_squish(key_words))
-keys_data$key_words <- tolower(keys_data$key_words)
+keys <- keys[1:32,] 
+keys_data <- keys %>% rename(key_words=Key.Words) %>% mutate(key_words = str_squish(key_words)) 
+keys_data$key_words <- tolower(keys_data$key_words) 
 ```
 
-## Step 5: end result is new_prac data frame 
+## Step 5: Add two columns. One with the matches that the NLP identifies ("NLP_heads"); the other with the matches that Katie identified
 
 ```{r}
 
-first25$NLP_heads <- sapply(first25$response_lower, FUN = function(x){
-  matches <- c("")
-  for (row in 1:nrow(keys_data)) {
-    string_head <- keys_data[row, "key_words"]
-    if(row == 23) {
+# Apply function to each row of the selected prep_section that identifies NLP matches. If the headline we are looking to match is 22 or 26, then add the "NOT" crosscheck
+
+prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){ 
+  matches <- c("") 
+  for (row in 1:nrow(keys_data)) { 
+    string_head <- keys_data[row, "key_words"] 
+    if(row == 22) { 
       if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("nixon", x))) {
         matches <- paste(matches, row)
-      } else if(isTRUE(grepl(string_head, x))) {
-        matches <- paste(matches, "")
       } else {
         matches <- paste(matches, "")
-      }
-    } else {
+      } next }
+    if(row == 26) {
+      if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("steel", x))) {
+        matches <- paste(matches, row)
+      } else {
+        matches <- paste(matches, "")
+      } next }
     if(isTRUE(grepl(string_head, x))) {
       matches <- paste(matches, row)
     } else {
-      matches <- paste(matches, "") } }
-  matches } } )
+      matches <- paste(matches, "")
+    } } matches } )
 
-# first25$NLP_heads <- sapply(first25$response_lower, FUN = function(x){
+# Creates column with a list of the headlines that Katie identified. Also (optionally) adds columns with the headlines that the NLP identified, disaggregated (e_#)
+
+section <- prep_section %>% 
+  mutate(unite(across(everything(), 
+                      ~ ifelse( . == "1", 
+                                cur_column(), NA)), 
+               na.rm = T, 
+               col = "manual_heads")) %>%
+  mutate(across(3:34, .names = "e_{.col}" )) %>%
+  rename_with(~str_c("k_", .), c(3:34))
+
+# NOT USED CURRENTLY, BUT KEEP JUST IN CASE
+# prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
 #   matches <- c("")
 #   for (row in 1:nrow(keys_data)) {
 #     string_head <- keys_data[row, "key_words"]
@@ -89,147 +106,118 @@ first25$NLP_heads <- sapply(first25$response_lower, FUN = function(x){
 #     } else {
 #       matches <- paste(matches, "") } }
 #   matches } )
-
-# note that the E columns are NOT correct at this stage
-new_prac <- first25 %>% 
-  mutate(unite(across(everything(), 
-                      ~ ifelse( . == "1", 
-                                cur_column(), NA)), 
-               na.rm = T, 
-               col = "manual_heads")) %>%
-  mutate(across(3:34, .names = "e_{.col}" )) %>%
-  rename_with(~str_c("k_", .), c(3:34))
-  
-  
 ```
 
-## Step 7: 
-## Create columns and rename katie's columns
-## change NAs to 0s to make computing easier
-# change ? to 0s
-```{r}
-
-index <- is.na(new_prac)
-new_prac[index] <- 0
-new_prac[new_prac=="?"]<- 0
-
-```
-
-## Step 8: change E rows
+## Step 6: Change NAs (blanks) to 0
 
 ```{r}
 
-for (i in 1:nrow(new_prac)) {
-  response <- new_prac[i, "response_lower"]
+index <- is.na(section)
+section[index] <- 0
+#section[section=="?"]<- 0
+
+```
+
+## Step 7: (Pretty much optional) Assigns 0 or 1 to e columns where the NLP identified a headline
+
+```{r}
+
+for (i in 1:nrow(section)) {
+  response <- section[i, "response_lower"]
   for (row in 1:nrow(keys_data)) {
     headline <- keys_data[row, "key_words"]
     col <- gsub(" ", "", paste("e_", row))
     if(isTRUE(grepl(headline, response))) {
-      new_prac[i, col] = 1
+      section[i, col] = 1
     } else {
-      new_prac[i, col] = 0 
+      section[i, col] = 0 
     }
   }
 } 
 ```
 
-## Step 9: 
+## Step 8: Create columns containing number of hits and not matches 
 
 ```{r}
 
-df <- new_prac
+section[3:34] <- lapply(section[3:34], as.numeric)
+section[39:70] <- lapply(section[39:70], as.numeric)
 
-df[3:34] <- lapply(df[3:34], as.numeric)
-df[39:70] <- lapply(df[39:70], as.numeric)
-
-df$hits <- NA_integer_
-df$not_matches <- NA_integer_
+section$hits <- NA_integer_
+section$not_matches <- NA_integer_
 
 suffixes <- 1:32
-for (i in 1:nrow(df)) {
+for (i in 1:nrow(section)) {
   hits <- vector("logical", length(suffixes))
   names(hits) <- suffixes
   not_matches <- vector("logical", length(suffixes))
   names(not_matches) <- suffixes
   for (j in suffixes) {
-    hits[[j]] <- (df[[glue("e_{j}")]][i] & df[[glue("k_{j}")]][i]) == 1
-    not_matches[[j]] <- df[[glue("e_{j}")]][i] != df[[glue("k_{j}")]][i]
+    hits[[j]] <- (section[[glue("e_{j}")]][i] & section[[glue("k_{j}")]][i]) == 1
+    not_matches[[j]] <- section[[glue("e_{j}")]][i] != section[[glue("k_{j}")]][i]
   }
-  df$hits[i] <- sum(hits, na.rm=T)
-  df$not_matches[i] <- sum(not_matches, na.rm = T)
+  section$hits[i] <- sum(hits, na.rm=T)
+  section$not_matches[i] <- sum(not_matches, na.rm = T)
 }
 
+# Create columns for percent accuracy, etc.
 
-df2 <- df %>% mutate( 
-                     total_hits_nm = hits + not_matches,
-                     percent_accuracy = hits / total_hits_nm, 
-                     manual_heads = str_replace_all(
-                       manual_heads, "[\\s_]", " "),
-                     NLP_heads = str_squish(NLP_heads))
+section2 <- section %>% mutate( 
+  total_hits_nm = hits + not_matches,
+  percent_accuracy = hits / total_hits_nm, 
+  manual_heads = str_replace_all(
+    manual_heads, "[\\s_]", " "),
+  NLP_heads = str_squish(NLP_heads))
 
 # Rearrange columns so more readable (I'm sure there's a way to NOT hard code this)
 
-df3 <- df2[, c(1, 36, 37, 38, 71, 72, 73, 74, 3, 39, 4, 40, 5, 41, 6, 42, 7, 43, 8, 44, 9, 45, 10, 46, 11, 47, 12, 48, 13, 49, 14, 50, 15, 51, 16, 52, 17, 53, 18, 54, 19, 55, 20, 56, 21, 57, 22, 58, 23, 59, 24, 60, 25, 61, 26, 62, 27, 63, 28, 64, 29, 65, 30, 66, 31, 67, 32, 68, 33, 69, 34, 70)] 
+section3 <- section2[, c(1, 36, 37, 38, 71, 72, 73, 74, 3, 39, 4, 40, 5, 41, 6, 42, 7, 43, 8, 44, 9, 45, 10, 46, 11, 47, 12, 48, 13, 49, 14, 50, 15, 51, 16, 52, 17, 53, 18, 54, 19, 55, 20, 56, 21, 57, 22, 58, 23, 59, 24, 60, 25, 61, 26, 62, 27, 63, 28, 64, 29, 65, 30, 66, 31, 67, 32, 68, 33, 69, 34, 70)] 
 
 ```
 
-## Make two new columns
+## Step 9: Create columns that show whether the NLP added or missed a headline
 
 ```{r}
 
-df_string_attempts <- df3
-
-df_string_attempts$added <- ""
-df_string_attempts$missing <- ""
+section3$added <- ""
+section3$missing <- ""
 
 suffixes <- 1:32
 
-for (i in 1:nrow(df_string_attempts)) {
+for (i in 1:nrow(section3)) {
   added <- ""
   missing <- ""
   empty <- ""
   for (j in suffixes) {
     
-    if (isTRUE(df_string_attempts[[glue("e_{j}")]][i] > df_string_attempts[[glue("k_{j}")]][i])) {
+    if (isTRUE(section3[[glue("e_{j}")]][i] > section3[[glue("k_{j}")]][i])) {
       added <- paste(added, j)
-    } else if (isTRUE(df_string_attempts[[glue("e_{j}")]][i] < df_string_attempts[[glue("k_{j}")]][i])) {
+    } else if (isTRUE(section3[[glue("e_{j}")]][i] < section3[[glue("k_{j}")]][i])) {
       missing <- paste(missing, j) 
     } else {
       NULL
     }
-    df_string_attempts$added[[i]] <- added
-    df_string_attempts$missing[[i]] <- missing
+    section3$added[[i]] <- added
+    section3$missing[[i]] <- missing
   }
 }
 
-df_string_attempts <- df_string_attempts[, c(1:8, 73, 74, 9:72)] 
+section3 <- section3[, c(1:8, 73, 74, 9:72)] 
 
-#View(df_string_attempts)
-View(df_string_attempts %>% select(response_lower,
-                              NLP_heads,
-                              manual_heads,
-                              added,
-                              missing))
-
-```
-
-## Find overall mean accuracy
-```{r}
-df_string_attempts %>% filter(isTRUE(grepl("22", df_string_attempts$missing)))
+# View(section3 %>% select(response_lower,
+#                               NLP_heads,
+#                               manual_heads,
+#                               added,
+#                               missing))
 
 ```
+
+## Find overall accuracy
 
 ```{r}
 
-mean(df_string_attempts$percent_accuracy, na.rm = T)
-# currently, as it standss: 70% for second batch
+mean(section3$percent_accuracy, na.rm = T)
+# currently, as it stands: 70% for second batch
 
 ```
-
-```{r}
-# Look more closely 
-response_closeup <- df_string_attempts %>% select(added, missing, response_lower) 
-
-```
-
 
