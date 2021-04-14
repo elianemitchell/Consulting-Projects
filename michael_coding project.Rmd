@@ -77,8 +77,26 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
         next
       } }
     
+    if(row == 23) { 
+      if(isTRUE(grepl(string_head, x)) & isTRUE(grepl("nixon", x))) {
+        matches <- paste(matches, row)
+        next
+      } else {
+        matches <- paste(matches, "")
+        next
+      } }
+    
+    if(row == 24) { 
+      if(isTRUE(grepl(string_head, x)) & isTRUE(grepl("tax.*cut | tax cuts? | cutting tax", x))) {
+        matches <- paste(matches, row)
+        next
+      } else {
+        matches <- paste(matches, "")
+        next
+      } }
+    
     if(row == 26) {
-      if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("steel", x))) {
+      if(isTRUE(grepl("hurt.*jobs | layoffs | less jobs | hurt employment | hurting employment | lower employment | jobs lost | less.*jobs | fewer.*jobs ", x)) & isTRUE(grepl("tarrifs? | tarriffs? | tariffs? | tarifs? | trade ", x))) {
         matches <- paste(matches, row)
         next
       } else {
@@ -90,26 +108,18 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
       matches <- paste(matches, row)
     } else {
       matches <- paste(matches, "") } } 
+  
   matches } )
 
 # Creates column with a list of the headlines that Katie identified. Also (optionally) adds columns with the headlines that the NLP identified, disaggregated (e_#)
 
 section <- prep_section %>% 
   mutate(unite(across(everything(), 
-                      ~ ifelse( . == "1", cur_column(), NA)), na.rm = T, col = "manual_heads")) %>%
+                      ~ ifelse( . == "1", cur_column(), NA)), 
+               na.rm = T, col = "manual_heads")) %>%
   mutate(across(3:34, .names = "e_{.col}" )) %>%
   rename_with(~str_c("k_", .), c(3:34))
 
-# NOT USED CURRENTLY, BUT KEEP JUST IN CASE
-# prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
-#   matches <- c("")
-#   for (row in 1:nrow(keys_data)) {
-#     string_head <- keys_data[row, "key_words"]
-#     if(isTRUE(grepl(string_head, x))) {
-#       matches <- paste(matches, row)
-#     } else {
-#       matches <- paste(matches, "") } }
-#   matches } )
 ```
 
 ## Step 6: Change NAs (blanks) to 0
@@ -122,7 +132,7 @@ section[index] <- 0
 
 ```
 
-## Step 7: (Pretty much optional) Assigns 0 or 1 to e columns where the NLP identified a headline
+## Step 7: (Pretty much optional) Assigns 0 or 1 to e columns where the NLP identified a headline. Though we use this later to see which headlines the NLP missed or added 
 
 ```{r}
 
@@ -131,6 +141,43 @@ for (i in 1:nrow(section)) {
   for (row in 1:nrow(keys_data)) {
     headline <- keys_data[row, "key_words"]
     col <- gsub(" ", "", paste("e_", row))
+    
+    if(row == 22) { 
+      if(isTRUE(grepl(headline, response)) & isTRUE(!grepl("nixon", response))) {
+        section[i, col] = 1
+        next
+      } else {
+        section[i, col] = 0
+        next
+      } }
+    
+    if(row == 23) { 
+      if(isTRUE(grepl(headline, response)) & isTRUE(grepl("nixon", response))) {
+        section[i, col] = 1
+        next
+      } else {
+        section[i, col] = 0
+        next
+      } }
+    
+    if(row == 24) { 
+      if(isTRUE(grepl(headline, response)) & isTRUE(grepl("tax.*cut | tax cuts? | cutting tax", response))) {
+        section[i, col] = 1
+        next
+      } else {
+        section[i, col] = 0
+        next
+      } }
+    
+    if(row == 26) {
+      if(isTRUE(grepl("hurt.*jobs | layoffs | less jobs | hurt employment | hurting employment | lower employment | jobs lost | less.*jobs | fewer.*jobs ", response)) & isTRUE(grepl("tarrifs? | tarriffs? | tariffs? | tarifs? | trade ", response))) {
+        section[i, col] = 1
+        next
+      } else {
+        section[i, col] = 0
+        next
+      } }
+    
     if(isTRUE(grepl(headline, response))) {
       section[i, col] = 1
     } else {
@@ -156,10 +203,23 @@ for (i in 1:nrow(section)) {
   names(hits) <- suffixes
   not_matches <- vector("logical", length(suffixes))
   names(not_matches) <- suffixes
-  for (j in suffixes) {
-    hits[[j]] <- (section[[glue("e_{j}")]][i] & section[[glue("k_{j}")]][i]) == 1
-    not_matches[[j]] <- section[[glue("e_{j}")]][i] != section[[glue("k_{j}")]][i]
-  }
+   for (j in suffixes) {
+     hits[[j]] <- (section[[glue("e_{j}")]][i] & section[[glue("k_{j}")]][i]) == 1
+     not_matches[[j]] <- section[[glue("e_{j}")]][i] != section[[glue("k_{j}")]][i]
+   }
+  #   if(j == 22) { 
+  #     hits[[j]] <- ((section[["e_22"]][i] & section[["k_22"]][i]) == 1) || ((section[["e_22"]][i] & section[["k_23"]][i]) == 1)
+  #     not_matches[[j]] <- (section[[glue("e_22")]][i] != section[[glue("k_22")]][i]) & (section[[glue("e_22")]][i] != section[[glue("k_23")]][i])
+  #     next
+  #   }
+  #   if(j == 23) {
+  #     hits[[j]] <- ((section[["e_23"]][i] & section[["k_23"]][i]) == 1) || ((section[["e_23"]][i] & section[["k_22"]][i]) == 1)
+  #     not_matches[[j]] <- (section[[glue("e_23")]][i] != section[[glue("k_23")]][i]) || (section[[glue("e_23")]][i] != section[[glue("k_22")]][i])
+  #     next
+  #   }
+  #   hits[[j]] <- (section[[glue("e_{j}")]][i] & section[[glue("k_{j}")]][i]) == 1
+  #   not_matches[[j]] <- section[[glue("e_{j}")]][i] != section[[glue("k_{j}")]][i]
+  # }
   section$hits[i] <- sum(hits, na.rm=T)
   section$not_matches[i] <- sum(not_matches, na.rm = T)
 }
