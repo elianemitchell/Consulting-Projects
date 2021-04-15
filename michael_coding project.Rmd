@@ -69,7 +69,7 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
     string_head <- keys_data[row, "key_words"] 
     
     if(row == 22) { 
-      if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("nixon", x))) {
+      if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("nixon | high | highest ", x))) {
         matches <- paste(matches, row)
         next
       } else {
@@ -87,7 +87,7 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
       } }
     
     if(row == 24) { 
-      if(isTRUE(grepl(string_head, x)) & isTRUE(grepl("tax.*cut | tax cuts? | cutting tax", x))) {
+      if(isTRUE(grepl(string_head, x)) & isTRUE(grepl("tax.*cut | tax cuts? | cutting tax | tax breaks?", x))) {
         matches <- paste(matches, row)
         next
       } else {
@@ -96,7 +96,7 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
       } }
     
     if(row == 26) {
-      if(isTRUE(grepl("hurt.*jobs | layoffs | less jobs | hurt employment | hurting employment | lower employment | jobs lost | less.*jobs | fewer.*jobs ", x)) & isTRUE(grepl("tarrifs? | tarriffs? | tariffs? | tarifs? | trade ", x))) {
+      if(isTRUE(grepl(string_head, x)) & isTRUE(grepl("tarrifs? | tarriffs? | tariffs? | tarifs? | trade ", x))) {
         matches <- paste(matches, row)
         next
       } else {
@@ -207,19 +207,6 @@ for (i in 1:nrow(section)) {
      hits[[j]] <- (section[[glue("e_{j}")]][i] & section[[glue("k_{j}")]][i]) == 1
      not_matches[[j]] <- section[[glue("e_{j}")]][i] != section[[glue("k_{j}")]][i]
    }
-  #   if(j == 22) { 
-  #     hits[[j]] <- ((section[["e_22"]][i] & section[["k_22"]][i]) == 1) || ((section[["e_22"]][i] & section[["k_23"]][i]) == 1)
-  #     not_matches[[j]] <- (section[[glue("e_22")]][i] != section[[glue("k_22")]][i]) & (section[[glue("e_22")]][i] != section[[glue("k_23")]][i])
-  #     next
-  #   }
-  #   if(j == 23) {
-  #     hits[[j]] <- ((section[["e_23"]][i] & section[["k_23"]][i]) == 1) || ((section[["e_23"]][i] & section[["k_22"]][i]) == 1)
-  #     not_matches[[j]] <- (section[[glue("e_23")]][i] != section[[glue("k_23")]][i]) || (section[[glue("e_23")]][i] != section[[glue("k_22")]][i])
-  #     next
-  #   }
-  #   hits[[j]] <- (section[[glue("e_{j}")]][i] & section[[glue("k_{j}")]][i]) == 1
-  #   not_matches[[j]] <- section[[glue("e_{j}")]][i] != section[[glue("k_{j}")]][i]
-  # }
   section$hits[i] <- sum(hits, na.rm=T)
   section$not_matches[i] <- sum(not_matches, na.rm = T)
 }
