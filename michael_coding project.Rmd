@@ -13,14 +13,19 @@ library("xlsx")
 library(tm)
 library(stringr)
 library(glue)
+install.packages("readxl")
+library(readxl)
+library(tidytext)
 ```
 
 ## Step 2: Load in data
 
 ```{r }
-data <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_three.xlsx", sheetIndex = 1, endRow=240)
+setwd("~/Desktop/R Folder")
 
-keys <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_three.xlsx", sheetIndex = 2, endRow=40)
+data <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_two.xlsx", sheetIndex = 1, endRow=352) # increase endRow if you want to see how the NLP adds rows without Katie
+
+keys <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_two.xlsx", sheetIndex = 2, endRow=40)
 
 ```
 
@@ -45,7 +50,7 @@ prep_section$response_lower <- str_pad(prep_section$response_lower,
                                   "both", " ")
 
 # Choose rows to isolate (can be 1-25, 26-50, 51-75, 76-100, 1-100, 101-150, 1-300, etc.)
-prep_section <- prep_section[c(1:200), ]
+prep_section <- prep_section[c(1:349), ]
 
 ```
 
@@ -68,6 +73,24 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
   for (row in 1:nrow(keys_data)) { 
     string_head <- keys_data[row, "key_words"] 
     
+    if(row == 6) {
+      if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("saved by", x))) {
+        matches <- paste(matches, row)
+        next
+      } else {
+        matches <- paste(matches, "")
+        next
+      } }
+    
+    if(row == 21) {
+      if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("1973", x))) {
+        matches <- paste(matches, row)
+        next
+      } else {
+        matches <- paste(matches, "")
+        next
+      } }
+    
     if(row == 22) { 
       if(isTRUE(grepl(string_head, x)) & isTRUE(!grepl("nixon", x)) & isTRUE(!grepl("^high", x))) {
         matches <- paste(matches, row)
@@ -87,7 +110,7 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
       } }
     
     if(row == 24) { 
-      if(isTRUE(grepl(string_head, x)) & isTRUE(grepl("tax.*cut | tax cuts? | cutting tax | tax breaks? | tax refunds? | tas plan", response))) {
+      if(isTRUE(grepl(string_head, x)) & isTRUE(grepl("tax.*cut | tax cuts? | cutting tax | tax breaks? | tax refunds? | tas plan | taxes", x))) {
         matches <- paste(matches, row)
         next
       } else {
@@ -95,7 +118,7 @@ prep_section$NLP_heads <- sapply(prep_section$response_lower, FUN = function(x){
         next
       } }
     
-    if(row == 26) {
+    if(row == 28) {
       if(isTRUE(grepl(string_head, x)) & isTRUE(grepl("tarrifs? | tarriffs? | tariffs? | tarifs? | trade ", x))) {
         matches <- paste(matches, row)
         next
@@ -142,6 +165,24 @@ for (i in 1:nrow(section)) {
     headline <- keys_data[row, "key_words"]
     col <- gsub(" ", "", paste("e_", row))
     
+    if(row == 6) {
+      if(isTRUE(grepl(headline, response)) & isTRUE(!grepl("saved by", response))) {
+        section[i, col] = 1
+        next
+      } else {
+        section[i, col] = 0
+        next
+      } }
+    
+    if(row == 21) {
+      if(isTRUE(grepl(headline, response)) & isTRUE(!grepl("1973", response))) {
+        section[i, col] = 1
+        next
+      } else {
+        section[i, col] = 0
+        next
+      } }
+    
     if(row == 22) { 
       if(isTRUE(grepl(headline, response)) & isTRUE(!grepl("nixon", response)) & isTRUE(!grepl("^high", response))) {
         section[i, col] = 1
@@ -161,7 +202,7 @@ for (i in 1:nrow(section)) {
       } }
     
     if(row == 24) { 
-      if(isTRUE(grepl(headline, response)) & isTRUE(grepl("tax.*cut | tax cuts? | cutting tax | tax breaks? | tax refunds? | tas plan", response))) {
+      if(isTRUE(grepl(headline, response)) & isTRUE(grepl("tax.*cut | tax cuts? | cutting tax | tax breaks? | tax refunds? | tas plan | taxes", response))) {
         section[i, col] = 1
         next
       } else {
@@ -273,12 +314,15 @@ mean(section3$percent_accuracy, na.rm = T)
 ## Tools for easily finding what headlines are added or are missing, and filtering out the rows where that headline is missing or added
 
 ```{r}
-# To show the most common missing or added headlines
+# To show the most common missing or added headlines. word = headline # ; n = frequency 
 View(section3 %>% unnest_tokens(word, missing) %>% count(word, sort=TRUE))
 View(section3 %>% unnest_tokens(word, added) %>% count(word, sort=TRUE))
 
 # To filter the rows with a headline missing
-filtered <- filter(section3, grepl("26", missing))
+filtered <- filter(section3, grepl("26", missing)) # change the # to see rows where the headline is missing
+View(filtered %>% select(response_lower, NLP_heads, manual_heads, added, missing))
+
+filtered <- filter(section3, grepl("6 ", added)) # change the # to see rows where the headline was added
 View(filtered %>% select(response_lower, NLP_heads, manual_heads, added, missing))
 
 ```
