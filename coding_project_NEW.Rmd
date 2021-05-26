@@ -22,9 +22,9 @@ slibrary(tidytext)
 ```{r }
 setwd("~/Desktop/R Folder")
 
-data <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_three.xlsx", sheetIndex = 1, endRow=352) # increase endRow if you want to see how the NLP adds rows without Katie
+data <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_two.xlsx", sheetIndex = 1, endRow=352) # increase endRow if you want to see how the NLP adds rows without Katie
 
-keys <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_three.xlsx", sheetIndex = 2, endRow=40)
+keys <- xlsx::read.xlsx("/Users/eliane/Desktop/R Folder/coding_data_two.xlsx", sheetIndex = 2, endRow=40) # increase endRow if you want to see how the NLP adds rows without Katie
 
 ```
 
@@ -49,8 +49,8 @@ prep_section$response_lower <- str_pad(prep_section$response_lower,
                                   "both", " ")
 
 # Choose rows to isolate (can be 1-25, 26-50, 51-75, 76-100, 1-100, 101-150, 1-300, etc.)
+#prep_section <- prep_section[c(1:349), ]
 prep_section <- prep_section[c(1:349), ]
-prep_section <- prep_section[c(1:200), ]
 
 
 ```
